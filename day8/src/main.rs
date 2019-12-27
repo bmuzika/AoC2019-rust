@@ -59,13 +59,29 @@ fn main() {
     println!("Result = {}", result);
 
 
-    let mut result_vec = Vec::new();
+    let mut result_vec = vec![2; 6*25];
 
-    for val in 0..6*25 {
-        for layer in 0..num_layers {
-
+    for layer in 0..num_layers {
+        let test_layer = image.clone().output_layer_digits(layer);
+        for val in 0..6*25 {
+            if test_layer[val] != 2 && result_vec[val] == 2 {
+                result_vec[val] = test_layer[val];
+            }
         }
     }
+    let row1 = &result_vec[0..24];
+    let row2 = &result_vec[25..25*2-1];
+    let row3 = &result_vec[25*2..25*3-1];
+    let row4 = &result_vec[25*3..25*4-1];
+    let row5 = &result_vec[25*4..25*5-1];
+    let row6 = &result_vec[25*5..25*6-1];
+    println!("{:?}", row1);
+    println!("{:?}", row2);
+    println!("{:?}", row3);
+    println!("{:?}", row4);
+    println!("{:?}", row5);
+    println!("{:?}", row6);
+
 }
 /*
 The image you received is 25 pixels wide and 6 pixels tall.
