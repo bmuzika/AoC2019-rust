@@ -31,7 +31,7 @@ pub mod IntcodeComputer {
         Dummy, // Not a normal opcode
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     enum ParameterMode{
         Immediate,
         Position,
@@ -62,7 +62,7 @@ pub mod IntcodeComputer {
 
         let mut cursor = 0;
         let mut code_to_execute = input_vector.clone();
-        let mut append_vec = vec![0; 10*code_to_execute.len()];
+        let mut append_vec = vec![0; 100*code_to_execute.len()];
 
         code_to_execute.append(&mut append_vec);
 
@@ -249,11 +249,12 @@ pub mod IntcodeComputer {
 
                 IntcodeOpcode::ReadInteger => {
                     //let mut input_value = String::new();
-
-                    print!("Enter a single integer: ");
+                    if parsed_opcode.parameter1_mode != ParameterMode::Position {
+                        panic!("Bad assumption!");
+                    }
+                    println!("Enter a single integer: ");
                     //io::stdout().flush();
                     //io::stdin().read_line(&mut input_value).ok().expect("Invalid input. Crashing now. Goodbye!\n");
-                    print!("\n");
 
                     let addr: usize = slice_to_work_on[1] as usize;
                     //let value_to_save = input_value.trim().parse::<i64>().expect("Invalid integer. Goodbye!\n");
@@ -266,8 +267,13 @@ pub mod IntcodeComputer {
                 },
 
                 IntcodeOpcode::PrintOutput => {
+                    if parsed_opcode.parameter1_mode != ParameterMode::Position {
+                        panic!("Bad assumption!");
+                    }
                     let addr: usize = slice_to_work_on[1] as usize;
                     cursor += 2;
+
+
 
                     println!("Value at addr {} is {}", addr, code_to_execute[addr]);
                     outputs_vector.send(code_to_execute[addr].clone());
