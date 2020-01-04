@@ -21,7 +21,7 @@ fn main() {
     if attempt > max_thrust {
         max_thrust = attempt;
     }
-    println!("Max thrust = {}", max_thrust);
+    println!("result = {}", attempt);
 }
 
 
@@ -37,14 +37,14 @@ fn run_amplifiers(program: String, phase_order: &str) -> i64 {
 
     });
 
-    tx0.send(5);
+    tx0.send(2);
     children.push(child);
 
     let child2 = thread::spawn(move || {
         loop {
             let val = rx1.next();
             match val {
-                Some(_) => println!("{}", val.unwrap()),
+                Some(_) => print!("{},", val.unwrap()),
                 None => break,
             }
         }

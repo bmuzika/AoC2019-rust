@@ -31,6 +31,73 @@ pub mod IntcodeComputer {
         Dummy, // Not a normal opcode
     }
 
+    fn parse(full_opcode: i64) -> ParsedOpcodes {
+        let opcode_num = full_opcode % 100;
+        let (mode1, mode2, mode3) = parse_parameter_mode(full_opcode/100).expect("Bad parameter mode!");
+        let mut slice_length = 0;
+
+        let opcode: Result<IntcodeOpcode, IntcodeParseError> = match opcode_num {
+            1 => {
+                slice_length = 4;
+                Ok(IntcodeOpcode::Add)
+            }, // Add opcode
+
+            2 => {
+                slice_length = 4;
+                Ok(IntcodeOpcode::Multiply)
+            },// Mult opcode
+
+            3 => {
+                slice_length = 2;
+                Ok(IntcodeOpcode::ReadInteger)
+            },
+
+            4 => {
+                slice_length = 2;
+                Ok(IntcodeOpcode::PrintOutput)
+            },
+
+            5 => {
+                slice_length = 3;
+                Ok(IntcodeOpcode::JumpIfTrue)
+            },
+
+            6 => {
+                slice_length = 3;
+                Ok(IntcodeOpcode::JumpIfFalse)
+            },
+
+            7 => {
+                slice_length = 4;
+                Ok(IntcodeOpcode::LessThan)
+            },
+
+            8 => {
+                slice_length = 4;
+                Ok(IntcodeOpcode::Equals)
+            },
+
+            9 => {
+                slice_length = 2;
+                Ok(IntcodeOpcode::RelativeBaseOffset)
+            },
+
+            99 => Ok(IntcodeOpcode::Halt),// Halt
+
+            _ => Err(IntcodeParseError::InvalidOpcode),// Err
+        };
+
+        let parsed_opcode = ParsedOpcodes{
+            opcode: opcode.expect("Bad opcode"),
+            parameter1_mode: mode1,
+            parameter2_mode: mode2,
+            parameter3_mode: mode3,
+            slice_length,
+        };
+
+        parsed_opcode
+    }
+
     #[derive(Debug, PartialEq)]
     enum ParameterMode{
         Immediate,
@@ -44,6 +111,7 @@ pub mod IntcodeComputer {
         parameter1_mode: ParameterMode,
         parameter2_mode: ParameterMode,
         parameter3_mode: ParameterMode,
+        slice_length: usize,
     }
 
     // input_vector is in reverse order
@@ -58,7 +126,7 @@ pub mod IntcodeComputer {
 
         let mut last_output = 0;
 
-        let mut relative_offset = 0;
+        let mut relative_offset: i64 = 0;
 
         let mut cursor = 0;
         let mut code_to_execute = input_vector.clone();
@@ -67,70 +135,12 @@ pub mod IntcodeComputer {
         code_to_execute.append(&mut append_vec);
 
         while cursor < code_to_execute.len() && code_to_execute[cursor] != 99 {
-            let mut slice_length = 0;
+            //let mut slice_length = 0;
             let full_opcode = code_to_execute[cursor];
-            let opcode_num = full_opcode % 100;
-            let (mode1, mode2, mode3) = parse_parameter_mode(full_opcode/100).expect("Bad parameter mode!");
 
-            let opcode: Result<IntcodeOpcode, IntcodeParseError> = match opcode_num {
-                1 => {
-                    slice_length = 4;
-                    Ok(IntcodeOpcode::Add)
-                }, // Add opcode
+            let parsed_opcode = parse(full_opcode);
 
-                2 => {
-                    slice_length = 4;
-                    Ok(IntcodeOpcode::Multiply)
-                },// Mult opcode
-
-                3 => {
-                    slice_length = 2;
-                    Ok(IntcodeOpcode::ReadInteger)
-                },
-
-                4 => {
-                    slice_length = 2;
-                    Ok(IntcodeOpcode::PrintOutput)
-                },
-
-                5 => {
-                    slice_length = 3;
-                    Ok(IntcodeOpcode::JumpIfTrue)
-                },
-
-                6 => {
-                    slice_length = 3;
-                    Ok(IntcodeOpcode::JumpIfFalse)
-                },
-
-                7 => {
-                    slice_length = 4;
-                    Ok(IntcodeOpcode::LessThan)
-                },
-
-                8 => {
-                    slice_length = 4;
-                    Ok(IntcodeOpcode::Equals)
-                },
-
-                9 => {
-                    slice_length = 2;
-                    Ok(IntcodeOpcode::RelativeBaseOffset)
-                },
-
-                99 => Ok(IntcodeOpcode::Halt),// Halt
-
-                _ => Err(IntcodeParseError::InvalidOpcode),// Err
-            };
-
-            let parsed_opcode = ParsedOpcodes{
-                opcode: opcode.expect("Bad opcode"),
-                parameter1_mode: mode1,
-                parameter2_mode: mode2,
-                parameter3_mode: mode3,
-            };
-
-            let slice_to_work_on = &code_to_execute[cursor..cursor + slice_length];
+            let slice_to_work_on = &code_to_execute[cursor..cursor + parsed_opcode.slice_length];
 
             match parsed_opcode.opcode {
                 IntcodeOpcode::Add => {
@@ -141,8 +151,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize;
-                            code_to_execute[reg+relative_offset]
+                            let reg: usize = (slice_to_work_on[1] + relative_offset) as usize;
+                            code_to_execute[reg]
                         },
 
                         ParameterMode::Immediate => slice_to_work_on[1],
@@ -157,7 +167,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset) as usize;
                             code_to_execute[reg]
                         },
 
@@ -178,8 +188,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let out_reg: usize = slice_to_work_on[3] as usize;
-                            code_to_execute[out_reg + relative_offset] = value;
+                            let out_reg = (slice_to_work_on[3] + relative_offset) as usize;
+                            code_to_execute[out_reg ] = value;
                             out_reg
                         },
 
@@ -200,8 +210,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize;
-                            code_to_execute[reg+relative_offset]
+                            let reg: usize = (slice_to_work_on[1] + relative_offset) as usize;
+                            code_to_execute[reg]
                         },
 
                         ParameterMode::Immediate => slice_to_work_on[1],
@@ -216,7 +226,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset) as usize;
                             code_to_execute[reg]
                         },
 
@@ -226,7 +236,7 @@ pub mod IntcodeComputer {
                     };
 
                     let value = v1 * v2;
-                    let out_reg =match parsed_opcode.parameter3_mode {
+                    let out_reg = match parsed_opcode.parameter3_mode {
                         ParameterMode::Position => {
                             let out_reg: usize = slice_to_work_on[3] as usize;
                             code_to_execute[out_reg] = value;
@@ -234,8 +244,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let out_reg: usize = slice_to_work_on[3] as usize;
-                            code_to_execute[out_reg + relative_offset] = value;
+                            let out_reg = (slice_to_work_on[3] + relative_offset) as usize;
+                            code_to_execute[out_reg ] = value;
                             out_reg
                         },
 
@@ -249,14 +259,15 @@ pub mod IntcodeComputer {
 
                 IntcodeOpcode::ReadInteger => {
                     //let mut input_value = String::new();
-                    if parsed_opcode.parameter1_mode != ParameterMode::Position {
-                        panic!("Bad assumption!");
-                    }
+                    let addr = match parsed_opcode.parameter1_mode {
+                        ParameterMode::Position => slice_to_work_on[1] as usize,
+                        ParameterMode::Relative => (slice_to_work_on[1] + relative_offset) as usize,
+                        _ => panic!("Bad param mode"),
+                    };
                     println!("Enter a single integer: ");
                     //io::stdout().flush();
                     //io::stdin().read_line(&mut input_value).ok().expect("Invalid input. Crashing now. Goodbye!\n");
 
-                    let addr: usize = slice_to_work_on[1] as usize;
                     //let value_to_save = input_value.trim().parse::<i64>().expect("Invalid integer. Goodbye!\n");
 
                     code_to_execute[addr] = inputs_vector.next().expect("panic at ReadInt");
@@ -267,17 +278,18 @@ pub mod IntcodeComputer {
                 },
 
                 IntcodeOpcode::PrintOutput => {
-                    if parsed_opcode.parameter1_mode != ParameterMode::Position {
-                        panic!("Bad assumption!");
-                    }
-                    let addr: usize = slice_to_work_on[1] as usize;
+                    let output = match parsed_opcode.parameter1_mode {
+                        ParameterMode::Position => code_to_execute[slice_to_work_on[1] as usize],
+                        ParameterMode::Relative => code_to_execute[(slice_to_work_on[1] + relative_offset) as usize],
+                        ParameterMode::Immediate => slice_to_work_on[1],
+                        _ => panic!("Bad param mode"),
+                    };
                     cursor += 2;
 
 
-
-                    println!("Value at addr {} is {}", addr, code_to_execute[addr]);
-                    outputs_vector.send(code_to_execute[addr].clone());
-                    last_output = code_to_execute[addr].clone();
+                    //println!("Output value is {}", cursor-2);
+                    outputs_vector.send(output.clone());
+                    last_output = output.clone();
                 },
 
                 IntcodeOpcode::JumpIfTrue => {
@@ -289,8 +301,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize;
-                            code_to_execute[reg+relative_offset]
+                            let reg: usize = (slice_to_work_on[1] + relative_offset as i64) as usize;
+                            code_to_execute[reg]
                         },
 
                         ParameterMode::Immediate => slice_to_work_on[1],
@@ -305,7 +317,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset as i64) as usize;
                             code_to_execute[reg]
                         },
 
@@ -317,7 +329,7 @@ pub mod IntcodeComputer {
                     if v1 != 0 {
                         cursor = v2 as usize;
                     } else {
-                        cursor += slice_length;
+                        cursor += parsed_opcode.slice_length;
                     }
                 },
 
@@ -330,8 +342,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize;
-                            code_to_execute[reg+relative_offset]
+                            let reg: usize = (slice_to_work_on[1] + relative_offset as i64) as usize;
+                            code_to_execute[reg]
                         },
 
                         ParameterMode::Immediate => slice_to_work_on[1],
@@ -346,7 +358,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset as i64) as usize;
                             code_to_execute[reg]
                         },
 
@@ -358,7 +370,7 @@ pub mod IntcodeComputer {
                     if v1 == 0 {
                         cursor = v2 as usize;
                     } else {
-                        cursor += slice_length;
+                        cursor += parsed_opcode.slice_length;
                     }
                 },
 
@@ -370,8 +382,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize;
-                            code_to_execute[reg+relative_offset]
+                            let reg: usize = (slice_to_work_on[1] + relative_offset as i64) as usize;
+                            code_to_execute[reg]
                         },
 
                         ParameterMode::Immediate => slice_to_work_on[1],
@@ -386,7 +398,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset as i64) as usize;
                             code_to_execute[reg]
                         },
 
@@ -411,8 +423,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let out_reg: usize = slice_to_work_on[3] as usize;
-                            code_to_execute[out_reg + relative_offset] = value;
+                            let out_reg = (slice_to_work_on[3] + relative_offset as i64) as usize;
+                            code_to_execute[out_reg ] = value;
                             out_reg
                         },
 
@@ -432,7 +444,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[1] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[1] + relative_offset as i64) as usize;
                             code_to_execute[reg]
                         },
 
@@ -448,7 +460,7 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let reg: usize = slice_to_work_on[2] as usize + relative_offset;
+                            let reg: usize = (slice_to_work_on[2] + relative_offset as i64) as usize;
                             code_to_execute[reg]
                         },
 
@@ -473,8 +485,8 @@ pub mod IntcodeComputer {
                         },
 
                         ParameterMode::Relative => {
-                            let out_reg: usize = slice_to_work_on[3] as usize;
-                            code_to_execute[out_reg + relative_offset] = value;
+                            let out_reg = (slice_to_work_on[3] + relative_offset as i64) as usize;
+                            code_to_execute[out_reg ] = value;
                             out_reg
                         },
 
@@ -487,12 +499,25 @@ pub mod IntcodeComputer {
                 },
 
                 IntcodeOpcode::RelativeBaseOffset => {
-                    let offset = slice_to_work_on[1];
-                    if offset < 0 {
-                        panic!["Bad offset"];
-                    }
 
-                    relative_offset = offset as usize;
+                    let v1 = match parsed_opcode.parameter1_mode {
+                        ParameterMode::Position => {
+                            let reg: usize = slice_to_work_on[1] as usize;
+                            code_to_execute[reg]
+                        },
+
+                        ParameterMode::Relative => {
+                            let reg: usize = (slice_to_work_on[1] + relative_offset) as usize;
+                            code_to_execute[reg]
+                        },
+
+                        ParameterMode::Immediate => slice_to_work_on[1],
+
+                        _ => panic!("There should be a parameter mode for V1"),
+                    };
+
+                    relative_offset += v1;
+                    cursor += parsed_opcode.slice_length;
                 },
 
                 IntcodeOpcode::Halt => {
